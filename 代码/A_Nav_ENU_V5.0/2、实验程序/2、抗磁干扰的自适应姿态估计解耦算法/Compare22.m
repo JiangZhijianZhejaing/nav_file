@@ -1,0 +1,108 @@
+clc;                            % 清理命令行
+clear;                          % 清理工作区
+addpath(genpath('../../'));     % 导入系统文件夹所有文件
+CalibParm_No1_20230301;         % 加载1号模块标定参数
+% ---------------二、标定数据---------------
+[Gyro_Set_InitCs, Acc_Set_InitCs, Mag_Set_InitCs, Marg_Number] = ...
+    MargCalibNoZero('Roll', 'Sheet1', CalibParm.Wp, CalibParm.p, CalibParm.mb, CalibParm.R);
+% ---------------三、转换东北天坐标系---------------
+[Gyro_Set, Acc_Set, Mag_Set] = MargENU_NoOne(Gyro_Set_InitCs, Acc_Set_InitCs, Mag_Set_InitCs);
+% 未归一化
+% ---------------四、解算静态姿态欧拉角---------------
+Eul_AccMag_Set = EulAccMag(Acc_Set, Mag_Set);
+Eul_SAESKF_Set = AESKF_Fun('Roll');
+Eul_SATEKF_Set = ATEKF_Fun('Roll');
+Eul_ADCF_Set = ADCF_Fun('Roll');
+
+Eul_Init = mean(Eul_AccMag_Set(50:200,:));       % 初始姿态欧拉角，取第50个到第200个欧拉角平均
+Mag = mean(Mag_Set(50:200,:));
+Yaw_Reference = YawMag(0, 0, Mag);
+Eul_Reference_Set = Yaw_Reference*ones(Marg_Number,1);
+
+
+Pitch1_MSE0 = 0;
+for k = 1:Marg_Number
+   Pitch1_E =  Eul_SAESKF_Set(k,1) - 0;
+   Pitch1_SE = Pitch1_E^2;
+   Pitch1_MSE0 = Pitch1_MSE0 + Pitch1_SE;
+end
+Pitch1_MSE = Pitch1_MSE0/Marg_Number;
+Pitch1_RMSE = sqrt(Pitch1_MSE);
+Pitch2_MSE0 = 0;
+for k = 1:Marg_Number
+   Pitch2_E =  Eul_SATEKF_Set(k,1) - 0;
+   Pitch2_SE = Pitch2_E^2;
+   Pitch2_MSE0 = Pitch2_MSE0 + Pitch1_SE;
+end
+Pitch2_MSE = Pitch2_MSE0/Marg_Number;
+Pitch2_RMSE = sqrt(Pitch2_MSE);
+Pitch3_MSE0 = 0;
+for k = 1:Marg_Number
+   Pitch3_E =  Eul_ADCF_Set(k,1) - 0;
+   Pitch3_SE = Pitch3_E^2;
+   Pitch3_MSE0 = Pitch3_MSE0 + Pitch3_SE;
+end
+Pitch3_MSE = Pitch3_MSE0/Marg_Number;
+Pitch3_RMSE = sqrt(Pitch3_MSE);
+Pitch_RMSE = [Pitch1_RMSE;Pitch2_RMSE;Pitch3_RMSE];
+
+Roll1_MSE0 = 0;
+for k = 1:Marg_Number
+   Roll1_E =  Eul_SAESKF_Set(k,2) - 0;
+   Roll1_SE = Roll1_E^2;
+   Roll1_MSE0 = Roll1_MSE0 + Roll1_SE;
+end
+Roll1_MSE = Roll1_MSE0/Marg_Number;
+Roll1_RMSE = sqrt(Roll1_MSE);
+Roll2_MSE0 = 0;
+for k = 1:Marg_Number
+   Roll2_E =  Eul_SATEKF_Set(k,2) - 0;
+   Roll2_SE = Roll2_E^2;
+   Roll2_MSE0 = Roll2_MSE0 + Roll2_SE;
+end
+Roll2_MSE = Roll2_MSE0/Marg_Number;
+Roll2_RMSE = sqrt(Roll2_MSE);
+Roll3_MSE0 = 0;
+for k = 1:Marg_Number
+   Roll3_E =  Eul_ADCF_Set(k,2) - 0;
+   Roll3_SE = Roll3_E^2;
+   Roll3_MSE0 = Roll3_MSE0 + Roll3_SE;
+end
+Roll3_MSE = Roll3_MSE0/Marg_Number;
+Roll3_RMSE = sqrt(Roll3_MSE);
+Roll_RMSE = [Roll1_RMSE;Roll2_RMSE;Roll3_RMSE];
+
+Yaw1_MSE0 = 0;
+for k = 1:Marg_Number
+   Yaw1_E =  Eul_SAESKF_Set(k,3) - Yaw_Reference;
+   Yaw1_SE = Yaw1_E^2;
+   Yaw1_MSE0 = Yaw1_MSE0 + Yaw1_SE;
+end
+Yaw1_MSE = Yaw1_MSE0/Marg_Number;
+Yaw1_RMSE = sqrt(Yaw1_MSE);
+Yaw2_MSE0 = 0;
+for k = 1:Marg_Number
+   Yaw2_E =  Eul_SATEKF_Set(k,3) - Yaw_Reference;
+   Yaw2_SE = Yaw2_E^2;
+   Yaw2_MSE0 = Yaw2_MSE0 + Yaw2_SE;
+end
+Yaw2_MSE = Yaw2_MSE0/Marg_Number;
+Yaw2_RMSE = sqrt(Yaw2_MSE);
+Yaw3_MSE0 = 0;
+for k = 1:Marg_Number
+   Yaw3_E =  Eul_ADCF_Set(k,3) - Yaw_Reference;
+   Yaw3_SE = Yaw3_E^2;
+   Yaw3_MSE0 = Yaw3_MSE0 + Yaw3_SE;
+end
+Yaw3_MSE = Yaw3_MSE0/Marg_Number;
+Yaw3_RMSE = sqrt(Yaw3_MSE);
+Yaw_RMSE = [Yaw1_RMSE;Yaw2_RMSE;Yaw3_RMSE];
+
+RMSE = [Pitch_RMSE,Roll_RMSE,Yaw_RMSE];
+
+
+
+
+figure(1)
+plot((1:Marg_Number)/100,Eul_SAESKF_Set(:,3),(1:Marg_Number)/100,Eul_SATEKF_Set(:,3),(1:Marg_Number)/100,Eul_ADCF_Set(:,3),(1:Marg_Number)/100,Eul_Reference_Set(:)),title('航向角 Yaw '),xlabel('时间 t/s'),ylabel('A/°'),legend('SAESKF','SATEKF','ADCF','Reference');
+
